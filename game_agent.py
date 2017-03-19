@@ -118,11 +118,18 @@ class CustomPlayer:
 
         self.time_left = time_left
 
+        print(time_left())
+        # print(game.to_string())
+
         # TODO: finish this function!
 
         # Perform any required initializations, including selecting an initial
         # move from the game board (i.e., an opening book), or returning
         # immediately if there are no legal moves
+        if not legal_moves:
+            return (-1, -1)
+
+        _, move = max([(self.score(game.forecast_move(m), self), m) for m in legal_moves])
 
         try:
             # The search method call (alpha beta or minimax) should happen in
@@ -136,7 +143,7 @@ class CustomPlayer:
             pass
 
         # Return the best move from the last completed search iteration
-        raise NotImplementedError
+        return move
 
     def minimax(self, game, depth, maximizing_player=True):
         """Implement the minimax search algorithm as described in the lectures.
