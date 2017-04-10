@@ -36,10 +36,31 @@ def custom_score(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
+    if game.is_loser(player):
+        return float("-inf")
 
-    # TODO: finish this function!
-    raise NotImplementedError
+    if game.is_winner(player):
+        return float("inf")
 
+    game_state_factor = 1
+    # Being in a corner in late game (less than 25% of board empty) is bad
+    if len(game.get_blank_spaces()) < game.width * game.height / 4.:
+        game_state_factor = 4
+
+    # Four corners
+    corners = [(0, 0),
+               (0, (game.width - 1)),
+               ((game.height - 1), 0),
+               ((game.height - 1), (game.width - 1))]
+
+    own_moves = game.get_legal_moves(player)
+    own_in_corner = [move for move in own_moves if move in corners]
+    opp_moves = game.get_legal_moves(game.get_opponent(player))
+    opp_in_corner = [move for move in opp_moves if move in corners]
+
+    # Penalize/reward move count if some moves are in the corner
+    return float(len(own_moves) - (game_state_factor * len(own_in_corner))
+                 - len(opp_moves) + (game_state_factor * len(opp_in_corner)))
 
 class CustomPlayer:
     """Game-playing agent that chooses a move using your evaluation function
@@ -118,32 +139,42 @@ class CustomPlayer:
 
         self.time_left = time_left
 
-        print(time_left())
-        # print(game.to_string())
-
-        # TODO: finish this function!
-
         # Perform any required initializations, including selecting an initial
         # move from the game board (i.e., an opening book), or returning
         # immediately if there are no legal moves
         if not legal_moves:
             return (-1, -1)
 
-        _, move = max([(self.score(game.forecast_move(m), self), m) for m in legal_moves])
+        temp_score_move_tuple = (float("-inf"), (-1, -1))
 
         try:
             # The search method call (alpha beta or minimax) should happen in
             # here in order to avoid timeout. The try/except block will
             # automatically catch the exception raised by the search method
             # when the timer gets close to expiring
-            pass
+            if (self.iterative):
+                temp_depth = 1
+
+                if (self.method == "minimax"):
+                    while (self.time_left() > 0):
+                        temp_score_move_tuple = self.minimax(game, temp_depth)
+                        temp_depth = temp_depth + 1
+                else:
+                    while (self.time_left() > 0):
+                        temp_score_move_tuple = self.alphabeta(game, temp_depth)
+                        temp_depth = temp_depth + 1
+            else:
+                if (self.method == "minimax"):
+                    return self.minimax(game, self.search_depth)[1]
+                else:
+                    return self.alphabeta(game, self.search_depth)[1]
 
         except Timeout:
             # Handle any actions required at timeout, if necessary
             pass
 
         # Return the best move from the last completed search iteration
-        return move
+        return temp_score_move_tuple[1]
 
     def minimax(self, game, depth, maximizing_player=True):
         """Implement the minimax search algorithm as described in the lectures.
@@ -176,11 +207,44 @@ class CustomPlayer:
                 to pass the project unit tests; you cannot call any other
                 evaluation function directly.
         """
+
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        legal_moves = game.get_legal_moves()
+
+        if (depth == 0) or (not legal_moves):
+            if maximizing_player:
+                return self.score(game, game.active_player), (-1, -1)
+            else:
+                return self.score(game, game.inactive_player), (-1, -1)
+
+        # This variable will be used to store the optimal move
+        temp_move = (-1, -1)
+
+        if maximizing_player:
+            temp_score = float("-inf")
+
+            for move in legal_moves:
+                new_board = game.forecast_move(move)
+                child_score, child_move = self.minimax(new_board, depth - 1, False)
+
+                if (child_score > temp_score):
+                    temp_score = child_score
+                    temp_move = move
+
+        else:
+            temp_score = float("inf")
+
+            for move in legal_moves:
+                new_board = game.forecast_move(move)
+                child_score, child_move = self.minimax(new_board, depth - 1, True)
+
+                if (child_score < temp_score):
+                    temp_score = child_score
+                    temp_move = move
+
+        return temp_score, temp_move
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf"), maximizing_player=True):
         """Implement minimax search with alpha-beta pruning as described in the
@@ -223,5 +287,40 @@ class CustomPlayer:
         if self.time_left() < self.TIMER_THRESHOLD:
             raise Timeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        legal_moves = game.get_legal_moves()
+
+        if (depth == 0) or (not legal_moves):
+            if maximizing_player:
+                return self.score(game, game.active_player), (-1, -1)
+            else:
+                return self.score(game, game.inactive_player), (-1, -1)
+
+        # This variable will be used to store the optimal move
+        temp_move = (-1, -1)
+
+        if maximizing_player:
+            v = float('-inf')
+            for move in legal_moves:
+                child_val = self.alphabeta(game.forecast_move(move), depth - 1, alpha, beta, False)[0]
+                if v < child_val:
+                    v = child_val
+                    temp_move = move
+                alpha = max(alpha, v)
+
+                if beta <= alpha:
+                    break
+
+            return v, temp_move
+
+        else:
+            v = float('Inf')
+            for move in legal_moves:
+                child_val = self.alphabeta(game.forecast_move(move), depth-1, alpha, beta, True)[0]
+                if child_val < v:
+                    v = child_val
+                    temp_move = move
+                beta = min(beta, v)
+                if beta <= alpha:
+                    break
+
+            return v, temp_move
